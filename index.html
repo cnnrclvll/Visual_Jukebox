@@ -1,0 +1,105 @@
+<html lang="en">
+    <head id="head">
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Music Visualizer</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.19.2/dist/css/uikit.min.css" />
+        <link rel="stylesheet" href="assets/css/style.css" />
+        <audio id="audio"></audio>
+    </head>
+
+    <body>
+        
+            <div class="search-container">
+                <!--search songs input-->
+                <form id="search-songs" class="uk-search uk-search-large" onsubmit="search(); return false;">
+                    <input id="search-sgs" class="uk-search-input" type="search" placeholder="Search Songs" aria-label="Search" autocomplete="off" spellcheck="false">
+                    <div id="results"></div>
+                </form>
+            
+
+                <!--search visuals input-->
+                <form id="search-visuals" class="uk-search uk-search-large" onsubmit="fetchBgs(); return false;">
+                    <input id="search-bgs" class="uk-search-input" type="search" placeholder="Search Visuals" aria-label="Search" autocomplete="off" spellcheck="false">
+                    <div id="results-bgs"></div>
+                </form>
+            </div>    
+
+
+            <!--populate img src through GIPHY API. adjust to fill viewport-->
+            <div class="uk-position-relative uk-visible-toggle uk-light" tabindex="-1">
+                <div id="toggle-animation" class="uk-position-center uk-panel"><p id="lyrics">To start building your visualizer<br>type in the search bars above.</p></div>
+                <ul class="uk-grid" uk-height-viewport="offset-top: true; offset-bottom: 30">
+                    <li id="bg-fill"></li>
+            </div>
+
+
+            <!---->
+            <div class="np-container">
+                <h1 id="np-song">Song Name</h1>
+                <h2 id="np-artist">Artist Name</h2>
+                <input type="range" id="volume-slider" value="2">
+            </div>
+
+            <div class="br-container">
+
+                <!--edit button target. use toggle-animation id for lyrics. potentially move this div to middle of body-->
+                <div class="lyrics-container">
+                    <button href="#toggle-animation" class="uk-button uk-button-default save-button" type="button" uk-toggle="target: #toggle-animation; animation: uk-animation-fade">Toggle Lyrics</button>
+                </div>
+
+
+                <!--saved visualizers modal-->
+                <div class="modals-container">
+                    <div class="saved-visualizers">
+
+                        <a class="uk-button uk-button-default save-button" href="#modal-center1" uk-toggle>Load Visualizer</a>
+
+                        <div id="modal-center1" class="uk-flex-top" uk-modal>
+                            <div id="modal1" class="uk-modal-dialog uk-modal-body uk-margin-auto-vertical">
+
+                                <button class="uk-modal-close-default" type="button" uk-close></button>
+                                <span>Your Visualizers:</span>
+                                <ul class="saved-visualizers-list">
+                                    
+                                </ul>
+
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!--save a visualizer modal-->
+                    <div class="save-visualizers">
+                        <a class="uk-button uk-button-default save-button" href="#modal-center2" uk-toggle>Save Visualizer</a>
+
+                        <div id="modal-center2" class="uk-flex-top" uk-modal>
+                            <div id="modal2" class="uk-modal-dialog uk-modal-body uk-margin-auto-vertical">
+
+                                <button class="uk-modal-close-default" type="button" uk-close></button>
+
+                                <form id="save-visualizers" type="submit">
+                                    <span>Name your visualizer:   </span>
+                                    <input id="save-vis-name" class="uk-input uk-width-1-1" type="type" placeholder="My Visualizer" aria-label="uk-width-1-1" autocomplete="off" spellcheck="false">
+                                    <button id="save-visualizers-btn" type="button" class="uk-button uk-button-default">Save</button>
+                                </form>
+
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>   
+
+
+
+            <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/uikit@3.19.2/dist/js/uikit.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/uikit@3.19.2/dist/js/uikit-icons.min.js"></script>
+            <script src="./assets/js/script.js"></script>
+            <script src="https://sdk.scdn.co/spotify-player.js"></script>
+
+        
+    </body>
+
+</html>
