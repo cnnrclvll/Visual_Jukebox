@@ -5,7 +5,6 @@ const morgan = require("morgan") // logging HTTP requests
 const cors = require("cors"); // handling requests from a different domain/port
 const path = require("path"); // path resolution
 const axios = require('axios'); // API requests
-const fetch = require("node-fetch"); // API requests     
 const querystring = require("querystring"); // encoding URL params
 
 const app = express();
@@ -27,14 +26,12 @@ const limiter = rateLimit({
     message: "Too many requests, please try again later.",
 });
 app.use(limiter);
-
-// Use morgan to log HTTP requests
 app.use(morgan("dev"));
 
 // Login route (for OAuth)
 app.get("/login", (req, res) => {
   const scopes = "streaming user-read-email user-read-private";
-  const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
   res.redirect(authURL);
 });
 
@@ -55,7 +52,11 @@ app.get('/callback', async (req, res) => {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
         const { access_token, refresh_token } = response.data;
-        res.cookie('refresh_token', refresh_token, { httpOnly: true, secure: true });
+        res.cookie('refresh_token', refresh_token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Secure only in production
+            sameSite: 'lax'
+        });        
         res.redirect(`${FRONTEND_URI}/?access_token=${access_token}`);
     } catch (error) {
         console.error('Error exchanging code for tokens:', error.response?.data || error.message);
@@ -86,100 +87,9 @@ app.get('/refresh_token', async (req, res) => {
     }
 });
 
-
-// Serve static assets
-app.use(express.static(path.join(__dirname, "../")));
-
-// Serve an index.html file for the root route
+// Serve static files
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "../index.html"));
-});
-
-
-
-let accessToken = null;
-let tokenExpirationTime = null;
-
-// Function to fetch a new access token/
-async function fetchAccessToken() {
-    try {
-        const response = await fetch("https://accounts.spotify.com/api/token", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                Authorization: `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`,
-            },
-            body: querystring.stringify({
-                grant_type: "client_credentials",
-            }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Failed to fetch access token:", errorText);
-            throw new Error("Failed to fetch access token");
-        }
-
-        const data = await response.json();
-        accessToken = data.access_token;
-        tokenExpirationTime = Date.now() + data.expires_in * 1000; // Set expiration time here
-
-        console.log("New access token fetched:", accessToken);
-    } catch (error) {
-        console.error("Error fetching access token:", error);
-    }
-}
-
-// Middleware to ensure a valid token exists
-async function ensureValidToken(req, res, next) {
-    try {
-        if (!accessToken || Date.now() >= tokenExpirationTime) {
-            await fetchAccessToken();
-        }
-        next();
-    } catch (error) {
-        res.status(500).json({ error: "Failed to fetch Spotify access token" });
-    }
-}
-
-// Apply token middleware to API routes
-app.use("/api", ensureValidToken);
-
-// Spotify API Proxy Route
-app.get("/api/spotify-data", async (req, res) => {
-    const query = req.query.q; // Extract query from request
-
-    if (!query) {
-        return res.status(400).json({ error: "Query parameter 'q' is required" });
-    }
-
-    const SPOTIFY_API_URL = `https://api.spotify.com/v1/search?${querystring.stringify({
-        q: query,
-        type: "track",
-        limit: 10, // Adjust limit as needed
-    })}`;
-
-    try {
-        const response = await fetch(SPOTIFY_API_URL, {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Spotify API Error:", errorText);
-            return res.status(response.status).json({ error: "Failed to fetch data from Spotify API" });
-        }
-
-        const data = await response.json();
-        console.log("Spotify API data:", data);
-        res.json(data);
-    } catch (error) {
-        console.error("Error fetching Spotify API data:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
+    res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // Start the server
