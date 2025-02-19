@@ -1,10 +1,11 @@
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const morgan = require("morgan")
-const cors = require("cors");
-const path = require("path");
-const fetch = require("node-fetch");
-const querystring = require("querystring");
+const express = require("express"); // server routing
+const rateLimit = require("express-rate-limit"); // rate-limiting
+const morgan = require("morgan") // logging HTTP requests
+const cors = require("cors"); // handling requests from a different domain/port
+const path = require("path"); // path resolution
+const axios = require('axios'); // API requests
+const fetch = require("node-fetch"); // API requests
+const querystring = require("querystring"); // encoding URL params
 require("dotenv").config();
 
 const app = express();
@@ -27,6 +28,60 @@ app.use(limiter);
 
 // Use morgan to log HTTP requests
 app.use(morgan("dev"));
+
+// Spotify API endpoints
+const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/api/token";
+const REDIRECT_URI = "http://localhost:3000/callback"; // Change for production
+
+// Login route (for OAuth)
+app.get("/login", (req, res) => {
+  const scopes = "streaming user-read-email user-read-private";
+  const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  res.redirect(authURL);
+});
+
+// Callback route to exchange code for access token
+app.get("/callback", async (req, res) => {
+    const code = req.query.code || null;
+    try {
+      const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
+        grant_type: "authorization_code",
+        code: code,
+        redirect_uri: REDIRECT_URI,
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+      }).toString(), {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+  
+      const { access_token, refresh_token } = response.data;
+      res.json({ access_token, refresh_token });
+    } catch (error) {
+      console.error("Error fetching tokens:", error.response?.data || error.message);
+      res.status(500).send("Authentication failed");
+    }
+  });
+  
+  // Endpoint to refresh access token
+  app.get("/refresh_token", async (req, res) => {
+    const refreshToken = req.query.refresh_token;
+    try {
+      const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+      }).toString(), {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+  
+      const { access_token } = response.data;
+      res.json({ access_token });
+    } catch (error) {
+      console.error("Error refreshing token:", error.response?.data || error.message);
+      res.status(500).send("Failed to refresh token");
+    }
+  });
 
 // Serve static assets
 app.use(express.static(path.join(__dirname, "../")));
