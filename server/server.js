@@ -5,12 +5,20 @@ const morgan = require("morgan") // logging HTTP requests
 const cors = require("cors"); // handling requests from a different domain/port
 const path = require("path"); // path resolution
 const axios = require('axios'); // API requests
-const fetch = require("node-fetch"); // API requests
+const fetch = require("node-fetch"); // API requests     
 const querystring = require("querystring"); // encoding URL params
-
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:3000/callback';
+const FRONTEND_URI = process.env.FRONTEND_URI || 'http://localhost:3000';
+const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/api/token';
+
+app.use(cors({ origin: FRONTEND_URI, credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
 
 // Rate limiting setup
 const limiter = rateLimit({
@@ -18,71 +26,66 @@ const limiter = rateLimit({
     max: 100, // Limit each IP to 100 requests per windowMs
     message: "Too many requests, please try again later.",
 });
-
-// Enable CORS for frontend domain
-app.use(cors({ 
-    origin: ["https://cnnrclvll.github.io/musicVisualizer/", "http://localhost:3000"]
-}));
-
-// Apply rate-limiting to all routes
 app.use(limiter);
 
 // Use morgan to log HTTP requests
 app.use(morgan("dev"));
 
-// Spotify API endpoints
-const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/api/token";
-const REDIRECT_URI = "http://localhost:3000/callback"; // Change for production
-
 // Login route (for OAuth)
 app.get("/login", (req, res) => {
   const scopes = "streaming user-read-email user-read-private";
-  const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
   res.redirect(authURL);
 });
 
-// Callback route to exchange code for access token
-app.get("/callback", async (req, res) => {
+// Callback route to exchange authorization code for tokens
+app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
-    try {
-      const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
-        grant_type: "authorization_code",
-        code: code,
-        redirect_uri: REDIRECT_URI,
-        client_id: process.env.SPOTIFY_CLIENT_ID,
-        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-      }).toString(), {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-  
-      const { access_token, refresh_token } = response.data;
-      res.json({ access_token, refresh_token });
-    } catch (error) {
-      console.error("Error fetching tokens:", error.response?.data || error.message);
-      res.status(500).send("Authentication failed");
+    if (!code) {
+        return res.status(400).send('Authorization code not found.');
     }
-  });
-  
-  // Endpoint to refresh access token
-  app.get("/refresh_token", async (req, res) => {
-    const refreshToken = req.query.refresh_token;
     try {
-      const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: process.env.SPOTIFY_CLIENT_ID,
-        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-      }).toString(), {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-  
-      const { access_token } = response.data;
-      res.json({ access_token });
+        const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: REDIRECT_URI,
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+        }).toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        const { access_token, refresh_token } = response.data;
+        res.cookie('refresh_token', refresh_token, { httpOnly: true, secure: true });
+        res.redirect(`${FRONTEND_URI}/?access_token=${access_token}`);
     } catch (error) {
-      console.error("Error refreshing token:", error.response?.data || error.message);
-      res.status(500).send("Failed to refresh token");
+        console.error('Error exchanging code for tokens:', error.response?.data || error.message);
+        res.status(500).send('Authentication failed.');
     }
-  });
+});
+
+// Refresh token endpoint
+app.get('/refresh_token', async (req, res) => {
+    const refreshToken = req.cookies.refresh_token;
+    if (!refreshToken) {
+        return res.status(400).send('No refresh token found.');
+    }
+    try {
+        const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+        }).toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        const { access_token } = response.data;
+        res.json({ access_token });
+    } catch (error) {
+        console.error('Error refreshing token:', error.response?.data || error.message);
+        res.status(500).send('Failed to refresh token.');
+    }
+});
+
 
 // Serve static assets
 app.use(express.static(path.join(__dirname, "../")));
@@ -92,9 +95,7 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../index.html"));
 });
 
-// Gain Access Token
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
+
 
 let accessToken = null;
 let tokenExpirationTime = null;
@@ -182,4 +183,4 @@ app.get("/api/spotify-data", async (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port http://localhost:${PORT}`));
