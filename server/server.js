@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express"); // server routing
 const rateLimit = require("express-rate-limit"); // rate-limiting
 const morgan = require("morgan") // logging HTTP requests
@@ -6,7 +7,7 @@ const path = require("path"); // path resolution
 const axios = require('axios'); // API requests
 const fetch = require("node-fetch"); // API requests
 const querystring = require("querystring"); // encoding URL params
-require("dotenv").config();
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -7,74 +7,12 @@ document.addEventListener('DOMContentLoaded', function() {
     audio.volume = 0.1; // Example volume level (30% of maximum volume)
 });
 
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
-require('dotenv').config();
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// Spotify API endpoints
-const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/api/token';
-const REDIRECT_URI = 'http://localhost:3000/callback'; // Change for production
-
 // Endpoint to authenticate with Spotify
 app.get('/login', (req, res) => {
     const scopes = 'streaming user-read-email user-read-private';
     const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
     res.redirect(authURL);
 });
-
-// Callback to exchange code for tokens
-app.get('/callback', async (req, res) => {
-    const code = req.query.code || null;
-    try {
-        const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: REDIRECT_URI,
-            client_id: process.env.SPOTIFY_CLIENT_ID,
-            client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-        }).toString(), {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-
-        const { access_token, refresh_token } = response.data;
-        res.json({ access_token, refresh_token });
-    } catch (error) {
-        console.error('Error fetching tokens:', error.response?.data || error.message);
-        res.status(500).send('Authentication failed');
-    }
-});
-
-// Endpoint to refresh the access token
-app.get('/refresh_token', async (req, res) => {
-    const refreshToken = req.query.refresh_token;
-    try {
-        const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: refreshToken,
-            client_id: process.env.SPOTIFY_CLIENT_ID,
-            client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-        }).toString(), {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-
-        const { access_token } = response.data;
-        res.json({ access_token });
-    } catch (error) {
-        console.error('Error refreshing token:', error.response?.data || error.message);
-        res.status(500).send('Failed to refresh token');
-    }
-});
-
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-
 
 // Display Results Function
 function displayResults(tracks) {
