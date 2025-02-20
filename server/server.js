@@ -5,6 +5,7 @@ const morgan = require("morgan") // logging HTTP requests
 const cors = require("cors"); // handling requests from a different domain/port
 const path = require("path"); // path resolution
 const axios = require('axios'); // API requests
+const cookieParser = require("cookie-parser");
 const querystring = require("querystring"); // encoding URL params
 
 const app = express();
@@ -18,6 +19,7 @@ const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/api/token';
 app.use(cors({ origin: FRONTEND_URI, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "..", "assets")));
 
 // Rate limiting setup
 const limiter = rateLimit({
@@ -89,7 +91,7 @@ app.get('/refresh_token', async (req, res) => {
 
 // Serve static files
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
+    res.sendFile(path.join(__dirname, "..", "assets", "index.html"));
 });
 
 // Start the server
