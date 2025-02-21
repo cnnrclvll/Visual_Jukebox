@@ -7,12 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
     audio.volume = 0.1; // Example volume level (30% of maximum volume)
 });
 
-// Endpoint to authenticate with Spotify
-app.get('/login', (req, res) => {
-    const scopes = 'streaming user-read-email user-read-private';
-    const authURL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-    res.redirect(authURL);
-});
 
 // Display Results Function
 function displayResults(tracks) {
