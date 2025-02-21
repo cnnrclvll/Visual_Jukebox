@@ -7,6 +7,71 @@ document.addEventListener('DOMContentLoaded', function() {
     audio.volume = 0.1; // Example volume level (30% of maximum volume)
 });
 
+async function getAccessToken() {
+    const response = await fetch('/token', { credentials: 'include' });
+    if (response.ok) {
+        const data = await response.json();
+        return data.access_token;
+    }
+    return null;
+}
+
+function search() {
+    const searchQuery = document.getElementById("search-sgs").value;
+    if (searchQuery.trim() === "") {
+        alert("Please enter a search term.");
+        return;
+    }
+
+    // Make a POST request to the backend server with the search query
+    fetch("/search-songs", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: searchQuery }),
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        displaySongResults(data); // Display the songs in the results div
+    })
+    .catch((error) => {
+        console.error("Error:", error);
+    });
+}
+
+function displaySongResults(songs) {
+    console.log("Tracks to display:", songs);
+    const resultsContainer = document.getElementById("results");
+    resultsContainer.innerHTML = ""; // Clear previous results
+
+    if (songs.length === 0) {
+        resultsContainer.innerHTML = '<p>No results found</p>';
+        return;
+    }
+
+    const songsList = document.createElement('ul');
+    songsList.classList.add('song-results-list');
+    songsList.setAttribute('id', 'song-results');
+    let count = 0;
+    
+    // Loop through the songs and display them
+    songs.forEach(song => {
+        if (count < 5) {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${song.name} - ${song.artists[0].name}`;
+            listItem.onclick = function () {
+                handleTrackSelection(song);
+            };
+            songsList.appendChild(listItem);
+            count++;
+        } else {
+            return;
+        }
+    });
+
+    resultsContainer.appendChild(songsList);
+}
 
 // Display Results Function
 function displayResults(tracks) {

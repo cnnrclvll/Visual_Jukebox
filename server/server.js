@@ -37,12 +37,12 @@ app.get("/login", (req, res) => {
   res.redirect(authURL);
 });
 
-// Callback route to exchange authorization code for tokens
 app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
     if (!code) {
         return res.status(400).send('Authorization code not found.');
     }
+
     try {
         const response = await axios.post(SPOTIFY_AUTH_URL, new URLSearchParams({
             grant_type: 'authorization_code',
@@ -53,17 +53,36 @@ app.get('/callback', async (req, res) => {
         }).toString(), {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
+
         const { access_token, refresh_token } = response.data;
+
+        // Store both tokens in HTTP-only cookies
+        res.cookie('access_token', access_token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Secure in production
+            sameSite: 'lax',
+        });
+
         res.cookie('refresh_token', refresh_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production', // Secure only in production
-            sameSite: 'lax'
-        });        
-        res.redirect(`${FRONTEND_URI}/?access_token=${access_token}`);
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+        });
+
+        // Redirect to frontend without leaking tokens in the URL
+        res.redirect(`${FRONTEND_URI}`);
     } catch (error) {
         console.error('Error exchanging code for tokens:', error.response?.data || error.message);
         res.status(500).send('Authentication failed.');
     }
+});
+
+app.get('/token', (req, res) => {
+    const access_token = req.cookies.access_token;
+    if (!access_token) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+    res.json({ access_token });
 });
 
 // Refresh token endpoint
@@ -88,6 +107,44 @@ app.get('/refresh_token', async (req, res) => {
         res.status(500).send('Failed to refresh token.');
     }
 });
+
+app.post("/search-songs", async (req, res) => {
+    const query = req.body.query;
+    const accessToken = req.cookies.access_token; // Ensure access token is stored in cookies
+
+    if (!accessToken) {
+        return res.status(401).send('Unauthorized: Access token missing');
+    }
+
+    try {
+        // Make a request to Spotify API for song search
+        const response = await axios.get("https://api.spotify.com/v1/search", {
+            params: {
+                q: query,
+                type: "track",
+                limit: 10, // Adjust the number of results
+            },
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+
+        // Extract relevant song details
+        const songs = response.data.tracks.items.map((track) => ({
+            name: track.name,
+            artist: track.artists.map(artist => artist.name).join(", "), // Join multiple artists if applicable
+            album: track.album.name,
+            preview_url: track.preview_url, // Optional: Add song preview if needed
+        }));
+
+        // Send the song data to the frontend
+        res.json(songs);
+    } catch (error) {
+        console.error("Error searching songs:", error);
+        res.status(500).send("Error searching Spotify");
+    }
+});
+
 
 // Serve static files
 app.get("/", (req, res) => {
